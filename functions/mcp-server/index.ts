@@ -1,15 +1,15 @@
 // ============================================
-// itboy 工具箱 · EdgeOne MCP Server
-// 纯工具型 MCP，无需大模型密钥，直接转发到 SCF
+// itboy 工具箱 · EdgeOne MCP Server (兼容綦桐网关终极版)
 // ============================================
 
-// 处理初始化请求
-const handleInitialize = (id: string) => {
+// 处理初始化请求（动态回传客户端请求的版本号，防止因版本不一致被拒绝）
+const handleInitialize = (id: string, params: any) => {
+  const clientVersion = params?.protocolVersion || "2024-11-05";
   return {
     jsonrpc: "2.0",
     id,
     result: {
-      protocolVersion: "2024-11-05",
+      protocolVersion: clientVersion,
       serverInfo: {
         name: "itboy-tools-mcp",
         version: "1.0.0",
@@ -74,7 +74,6 @@ const handleToolsList = (id: string) => {
 const handleToolCall = async (id: string, name: string, args: any) => {
   let url = '';
   
-  // 根据 AI 调用的工具名，拼装对应的 SCF API 请求地址
   if (name === 'get_weather') {
     url = `https://api.itboy.pw/?action=weather&city=${encodeURIComponent(args.city)}&format=text`;
   } else if (name === 'get_news60') {
@@ -93,11 +92,9 @@ const handleToolCall = async (id: string, name: string, args: any) => {
   }
 
   try {
-    // 执行请求
     const r = await fetch(url);
     const text = await r.text();
     
-    // 返回标准 MCP 格式给 AI
     return {
       jsonrpc: "2.0",
       id,
@@ -115,7 +112,6 @@ const handleToolCall = async (id: string, name: string, args: any) => {
   }
 };
 
-// 处理无效请求
 const handleResourcesOrPromptsList = (id: string, method: string) => {
   const resultKey = method.split("/")[0];
   return {
@@ -133,22 +129,9 @@ const handleUnknownMethod = (id: string) => {
   };
 };
 
-// 处理 CORS 预检请求
-const handleCorsRequest = () => {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Max-Age": "86400",
-    },
-  });
-};
-
 // 解析并路由 JSON-RPC 请求
 const processJsonRpcRequest = async (body: any) => {
-  if (body.method === "initialize") return handleInitialize(body.id);
+  if (body.method === "initialize") return handleInitialize(body.id, body.params);
   if (body.method === "tools/list") return handleToolsList(body.id);
   
   if (body.method === "tools/call") {
@@ -172,13 +155,34 @@ const processJsonRpcRequest = async (body: any) => {
 export const onRequest = async ({ request }: { request: Request }) => {
   const method = request.method.toUpperCase();
 
+  // 统一的响应头（把网关可能检查的所有东西都加上）
+  const commonHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, Mcp-Protocol-Version, Accept",
+    "Access-Control-Max-Age": "86400",
+    "MCP-Protocol-Version": "2024-11-05",
+  };
+
   try {
     // 1. 处理跨域预检
     if (method === "OPTIONS") {
-      return handleCorsRequest();
+      return new Response(null, { status: 204, headers: commonHeaders });
     }
 
-    // 2. 处理 POST 请求（AI 发来的 JSON-RPC）
+    // 2. 处理 GET 请求（迎合网关的探活机制，不再拒绝，而是返回友好的 SSE）
+    if (method === "GET") {
+      return new Response("event: endpoint\ndata: /mcp-server\n\n", {
+        headers: {
+          ...commonHeaders,
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      });
+    }
+
+    // 3. 处理 POST 请求（AI 发来的 JSON-RPC）
     if (method === "POST") {
       const contentType = request.headers.get("content-type");
       if (!contentType?.includes("application/json")) {
@@ -187,14 +191,30 @@ export const onRequest = async ({ request }: { request: Request }) => {
 
       const body = await request.json();
       const responseData = await processJsonRpcRequest(body);
+      const jsonString = JSON.stringify(responseData);
 
-      return new Response(JSON.stringify(responseData), {
-        headers: { "Content-Type": "application/json" },
+      // 如果网关要求的是 SSE 流（Accept: text/event-stream），就把它包成流返回
+      if (request.headers.get("accept")?.includes("text/event-stream")) {
+        return new Response(`event: message\ndata: ${jsonString}\n\n`, {
+          headers: {
+            ...commonHeaders,
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+          },
+        });
+      }
+
+      // 否则返回标准 JSON
+      return new Response(jsonString, {
+        headers: {
+          ...commonHeaders,
+          "Content-Type": "application/json",
+        },
       });
     }
 
-    // 3. 其他方法（如 GET）不做处理，因为我们用 HTTP 模式而非 SSE 流
-    return new Response("Method Not Allowed", { status: 405 });
+    return new Response("Method Not Allowed", { status: 405, headers: commonHeaders });
   } catch (error: any) {
     console.error("MCP 处理错误:", error);
     return new Response(
@@ -205,7 +225,7 @@ export const onRequest = async ({ request }: { request: Request }) => {
       }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...commonHeaders },
       }
     );
   }
