@@ -1,12 +1,9 @@
 // ============================================
-// itboy 工具箱 · EdgeOne MCP Server (全功能版 6 个工具)
-// 新增：Whois 域名查询
+// itboy 工具箱 · EdgeOne MCP Server (全功能 14 个工具)
 // ============================================
 
-// 强制使用最新协议版本
 const PROTOCOL_VERSION = "2025-06-18";
 
-// 定义工具列表
 const TOOLS = [
   {
     name: "get_weather",
@@ -41,7 +38,6 @@ const TOOLS = [
       required: ["region"],
     },
   },
-  // ===== 新增的 Whois 工具 =====
   {
     name: "get_whois",
     description: "查询域名的 Whois 注册信息",
@@ -51,36 +47,81 @@ const TOOLS = [
       required: ["domain"],
     },
   },
+  {
+    name: "get_lunar",
+    description: "获取今日农历/黄历信息（干支、生肖、星座、宜忌）",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_ai_news",
+    description: "获取 AI 资讯快报",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_weibo_hot",
+    description: "获取微博热搜榜",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_baidu_hot",
+    description: "获取百度实时热搜榜",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_toutiao_hot",
+    description: "获取头条热搜榜",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_zhihu_hot",
+    description: "获取知乎话题榜",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_history_today",
+    description: "获取历史上的今天发生的事件",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_exchange_rate",
+    description: "获取当日人民币对外币汇率",
+    inputSchema: { type: "object", properties: {} },
+  },
 ];
 
-// 处理初始化
 const handleInitialize = (id: string) => ({
   jsonrpc: "2.0",
   id,
   result: {
     protocolVersion: PROTOCOL_VERSION,
-    serverInfo: { name: "itboy-tools-mcp", version: "2.0.0" },
+    serverInfo: { name: "itboy-tools-mcp", version: "3.0.0" },
     capabilities: { tools: {} },
   },
 });
 
-// 处理工具列表
 const handleToolsList = (id: string) => ({
   jsonrpc: "2.0",
   id,
   result: { tools: TOOLS },
 });
 
-// 处理工具调用
 const handleToolCall = async (id: string, name: string, args: any) => {
   let url = '';
-  if (name === 'get_weather') url = `https://api.itboy.pw/?action=weather&city=${encodeURIComponent(args.city)}&format=text`;
-  else if (name === 'get_news60') url = `https://api.itboy.pw/?action=news60&format=text`;
-  else if (name === 'get_it_news') url = `https://api.itboy.pw/?action=itnews&format=text`;
-  else if (name === 'get_gold_price') url = `https://api.itboy.pw/?action=gold&format=text`;
-  else if (name === 'get_oil_price') url = `https://api.itboy.pw/?action=oil&region=${encodeURIComponent(args.region)}&format=text`;
-  // ===== 新增的分发逻辑 =====
-  else if (name === 'get_whois') url = `https://api.itboy.pw/?action=whois&domain=${encodeURIComponent(args.domain)}&format=text`;
+  const base = 'https://api.itboy.pw/';
+  if (name === 'get_weather') url = `${base}?action=weather&city=${encodeURIComponent(args.city)}&format=text`;
+  else if (name === 'get_news60') url = `${base}?action=news60&format=text`;
+  else if (name === 'get_it_news') url = `${base}?action=itnews&format=text`;
+  else if (name === 'get_gold_price') url = `${base}?action=gold&format=text`;
+  else if (name === 'get_oil_price') url = `${base}?action=oil&region=${encodeURIComponent(args.region)}&format=text`;
+  else if (name === 'get_whois') url = `${base}?action=whois&domain=${encodeURIComponent(args.domain)}&format=text`;
+  else if (name === 'get_lunar') url = `${base}?action=lunar&format=text`;
+  else if (name === 'get_ai_news') url = `${base}?action=ainews&format=text`;
+  else if (name === 'get_weibo_hot') url = `${base}?action=weibo&format=text`;
+  else if (name === 'get_baidu_hot') url = `${base}?action=baiduhot&format=text`;
+  else if (name === 'get_toutiao_hot') url = `${base}?action=toutiaohot&format=text`;
+  else if (name === 'get_zhihu_hot') url = `${base}?action=zhihuhot&format=text`;
+  else if (name === 'get_history_today') url = `${base}?action=history&format=text`;
+  else if (name === 'get_exchange_rate') url = `${base}?action=exchange&format=text`;
   else return { jsonrpc: "2.0", id, error: { code: -32601, message: "工具不存在" } };
 
   try {
