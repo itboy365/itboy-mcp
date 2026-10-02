@@ -1,5 +1,5 @@
 // ============================================
-// itboy 工具箱 · EdgeOne MCP Server (全功能 14 个工具)
+// itboy 工具箱 · EdgeOne MCP Server (全功能 16 个工具)
 // ============================================
 
 const PROTOCOL_VERSION = "2025-06-18";
@@ -87,6 +87,17 @@ const TOOLS = [
     description: "获取当日人民币对外币汇率",
     inputSchema: { type: "object", properties: {} },
   },
+  // ===== 新增 2 个 =====
+  {
+    name: "get_dongchedi_hot",
+    description: "获取懂车帝汽车热搜榜",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_hacker_news",
+    description: "获取 Hacker News 热帖（标题为英文，展示前请翻译成中文）",
+    inputSchema: { type: "object", properties: {} },
+  },
 ];
 
 const handleInitialize = (id: string) => ({
@@ -94,7 +105,7 @@ const handleInitialize = (id: string) => ({
   id,
   result: {
     protocolVersion: PROTOCOL_VERSION,
-    serverInfo: { name: "itboy-tools-mcp", version: "3.0.0" },
+    serverInfo: { name: "itboy-tools-mcp", version: "3.1.0" },
     capabilities: { tools: {} },
   },
 });
@@ -122,6 +133,8 @@ const handleToolCall = async (id: string, name: string, args: any) => {
   else if (name === 'get_zhihu_hot') url = `${base}?action=zhihuhot&format=text`;
   else if (name === 'get_history_today') url = `${base}?action=history&format=text`;
   else if (name === 'get_exchange_rate') url = `${base}?action=exchange&format=text`;
+  else if (name === 'get_dongchedi_hot') url = `${base}?action=dongchedi&format=text`;
+  else if (name === 'get_hacker_news') url = `${base}?action=hackernews&format=text`;
   else return { jsonrpc: "2.0", id, error: { code: -32601, message: "工具不存在" } };
 
   try {
